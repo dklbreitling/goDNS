@@ -1,16 +1,18 @@
 // DNS according to [RFC 1035] DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION
 //
 // [RFC 1035]: https://datatracker.ietf.org/doc/html/rfc1035
-package goDNS
+package main
 
 import (
 	"bytes"
+	"fmt"
+	"net"
 )
 
-// See [Sec. 3.2.2 TYPE Values] and [Sec. 3.2.3 QTYPE Values]
+// See [Sec. 3.2.2 TYPE Values] and [Sec. 3.2.3 QType Values]
 //
 // [Sec. 3.2.2 TYPE Values]: https://datatracker.ietf.org/doc/html/rfc1035#section-3.2.2
-// [Sec. 3.2.3 QTYPE Values]: https://datatracker.ietf.org/doc/html/rfc1035#section-3.2.3
+// [Sec. 3.2.3 QType Values]: https://datatracker.ietf.org/doc/html/rfc1035#section-3.2.3
 type QType uint16
 
 const (
@@ -38,10 +40,10 @@ const (
 	QTYPE_ASTERISK              // a request for all records (symbol "*" in RFC)
 )
 
-// See [Sec. 3.2.4 CLASS Values] and [Sec. 3.2.5 QCLASS Values]
+// See [Sec. 3.2.4 CLASS Values] and [Sec. 3.2.5 QClass Values]
 //
 // [Sec. 3.2.4 CLASS Values]: https://datatracker.ietf.org/doc/html/rfc1035#section-3.2.4
-// [Sec. 3.2.5 QCLASS Values]: https://datatracker.ietf.org/doc/html/rfc1035#section-3.2.5
+// [Sec. 3.2.5 QClass Values]: https://datatracker.ietf.org/doc/html/rfc1035#section-3.2.5
 type QClass uint16
 
 const (
@@ -104,16 +106,80 @@ const (
 	HDR_RCODE_REF     Header_Bitfield = 5       // Refused - The name server refuses to perform the specified operation for policy reasons.  For example, a name server may not wish to provide the information to the particular requester, or a name server may not wish to perform a particular operation (e.g., zone transfer) for particular data.
 )
 
+// See [Sec. 4.1.1 Header section format].
+//
+// [Sec. 4.1.1 Header section format]: https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.1
 type BGPHeader struct {
+	// A 16 bit identifier assigned by the program that
+	// generates any kind of query.  This identifier is copied
+	// the corresponding reply and can be used by the requester
+	// to match up replies to outstanding queries.
 	ID      uint16
-	MaskRow uint16
-	QDCount uint16
-	ANCount uint16
-	NSCount uint16
-	ARCount uint16
+	MaskRow Header_Bitfield
+	QDCount uint16 // the number of entries in the question section
+	ANCount uint16 // the number of resource records in the answer section
+	NSCount uint16 // the number of name server resource records in the authority records section
+	ARCount uint16 // the number of resource records in the additional records section
 }
 
-type BGPQuestion struct{}
+// Domain names in messages are expressed in terms of a sequence of labels.
+// Each label is represented as a one octet length field followed by that
+// number of octets.  Since every domain name ends with the null label of
+// the root, a domain name is terminated by a length byte of zero.  The
+// high order two bits of every length octet must be zero, and the
+// remaining six bits of the length field limit the label to 63 octets or
+// less.
+//
+// To simplify implementations, the total length of a domain name (i.e.,
+// label octets and label length octets) is restricted to 255 octets or
+// less.
+//
+// Although labels can contain any 8 bit values in octets that make up a
+// label, it is strongly recommended that labels follow the preferred
+// syntax described elsewhere in this memo, which is compatible with
+// existing host naming conventions.  Name servers and resolvers must
+// compare labels in a case-insensitive manner (i.e., A=a), assuming ASCII
+// with zero parity.  Non-alphabetic codes must match exactly.
+//
+// 63 octets or less
+//
+// Example: www.google.com
+//
+// www -> hex 03 77 77 77
+//
+// google -> hex 06 67 6f 6f 67 6c 65
+//
+// com -> hex 03 63 6f 6d
+type label struct {
+	length byte
+	data   []byte
+}
+
+// The question section is used to carry the "question" in most queries,
+// i.e., the parameters that define what is being asked.  The section
+// contains QDCOUNT (usually 1) entries. See [Sec. 4.1.2 Question section format].
+//
+// [Sec. 4.1.2 Question section format]: https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.2
+type BGPQuestion struct {
+	// A domain name represented as a sequence of labels, where
+	// each label consists of a length octet followed by that
+	// number of octets.  The domain name terminates with the
+	// zero length octet for the null label of the root.  Note
+	// that this field may be an odd number of octets; no
+	// padding is used.
+	//
+	// 255 octets or less
+	QNAME []label
+	// A two octet code which specifies the type of the query.
+	// The values for this field include all codes valid for a
+	// TYPE field, together with some more general codes which
+	// can match more than one type of RR.
+	QTYPE QType
+	// A two octet code that specifies the class of the query.
+	// For example, the QCLASS field is IN for the Internet.
+	QCLASS QClass
+}
+
 type BGPAnswer struct{}
 type BGPAuthority struct{}
 type BGPAdditional struct{}
@@ -126,5 +192,116 @@ type BGPMessage struct {
 	Additional []RR
 }
 
+func (m BGPMessage) toRawBytes() []byte { return nil }
+
+func getHeaderID() uint16 { return 0xBEEF }
+
+func getNameServerAddress() string { return "9.9.9.9:53" }
+
+func getProtocol() string { return "tcp" }
+
+func getHeaderMaskRow() Header_Bitfield { return HDR_QR_QUERY | HDR_OPCODE_QUERY | HDR_RD }
+
+func splitDomainNameIntoLabels(domain []byte) []label {
+	subdomains := make([][]byte, 0)
+	previousStop := 0
+	for index, char := range domain {
+		if char == byte(0x2E) { // ascii '.'
+			subdomains = append(subdomains, domain[previousStop:index])
+			previousStop = index + 1
+		} else if index == len(domain)-1 {
+			subdomains = append(subdomains, domain[previousStop:])
+		}
+	}
+
+	labels := make([]label, len(subdomains))
+	for index, subdomain := range subdomains {
+		labels[index] = label{length: byte(len(subdomain)), data: subdomain}
+	}
+
+	return labels
+}
+
+func buildQuestion(domain []byte) BGPQuestion {
+	QName := splitDomainNameIntoLabels(domain)
+	return BGPQuestion{QNAME: QName, QTYPE: QType_A, QCLASS: QCLASS_IN}
+}
+
+func buildQuery(domain []byte) BGPMessage {
+	header := BGPHeader{ID: getHeaderID(), MaskRow: getHeaderMaskRow(), QDCount: 1, ANCount: 0, NSCount: 0, ARCount: 0}
+	question := buildQuestion(domain)
+	return BGPMessage{Header: header, Question: question, Answer: nil, Authority: nil, Additional: nil}
+}
+
+func queryDomain(domain []byte) {
+	nameServerAddress := getNameServerAddress()
+	protocol := getProtocol()
+
+	conn, err := net.Dial(protocol, nameServerAddress)
+	if err != nil {
+		fmt.Printf("Error dialing: %v\n", err)
+	}
+
+	query := buildQuery(domain)
+
+	fmt.Printf("Query is:\n%v\n", query)
+
+	return
+
+	rawQuery := query.toRawBytes()
+
+	nBytesWritten, err := conn.Write(rawQuery)
+	if err != nil {
+		fmt.Printf("Error dialing: %v\n", err)
+	} else if nBytesWritten != len(rawQuery) {
+		fmt.Printf("nBytesWritten (%v) not equal to len(query) (%v)\n", nBytesWritten, len(rawQuery))
+	}
+
+	responseBuffer := make([]byte, 4*1024) // UDP capped at 512
+	nBytesRecvd, err := conn.Read(responseBuffer)
+	if err != nil {
+		fmt.Printf("Error receiving: %v\n", err)
+	}
+
+	fmt.Printf("Recv'd %d bytes\n", nBytesRecvd)
+	fmt.Printf("Recv'd:\n%x\n", responseBuffer[nBytesRecvd])
+}
+
 func main() {
+	// _header := []byte("")
+
+	// 	conn, err := net.Dial("tcp", "9.9.9.9:53")
+	// 	if err != nil {
+	// 		fmt.Printf("Error dialing: %v\n", err)
+	// 	}
+	// 	_, err = conn.Write([]byte("Hello"))
+	// 	if err != nil {
+	// 		fmt.Printf("Error sending: %v\n", err)
+	// 	}
+	// 	buffer := make([]byte, 1024)
+	// 	recv_len, err := conn.Read(buffer)
+	// 	if err != nil {
+	// 		fmt.Printf("Error receiving: %v\n", err)
+	// 	}
+	// 	fmt.Println("Recv'd: ", string(buffer[recv_len]))
+
+	// conn, err := net.Dial("tcp", "google.com:80")
+	// if err != nil {
+	// 	fmt.Printf("Error dialing: %v\n", err)
+	// }
+
+	// fmt.Fprintf(conn, "GET / HTTP/1.0\r\n\r\n")
+	// status, err := bufio.NewReader(conn).ReadString('\n')
+	// fmt.Println("status: ", status)
+	// buffer := make([]byte, 1024*1024)
+	// recv_len, err := conn.Read(buffer)
+	// if err != nil {
+	// 	fmt.Printf("Error receiving: %v\n", err)
+	// }
+	// fmt.Printf("Recv'd %d bytes\n", recv_len)
+	// fmt.Println("Recv'd: ", buffer[recv_len])
+
+	// defer conn.Close()
+
+	queryDomain([]byte("www.google.com"))
 }
