@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"time"
 )
 
 // See [Sec. 3.2.2 TYPE Values] and [Sec. 3.2.3 QType Values]
@@ -353,10 +354,24 @@ func queryDomain(domain []byte) {
 	}
 
 	query := buildQuery(domain)
+	rawQuery := query.toRawBytes()
 
 	fmt.Printf("Query is:\n%v\n", query)
 
-	rawQuery := query.toRawBytes()
+	// Messages sent over TCP connections use server port 53 (decimal).  The
+	// message is prefixed with a two byte length field which gives the message
+	// length, excluding the two byte length field.  This length field allows
+	// the low-level processing to assemble a complete message before beginning
+	// to parse it.
+	if protocol == "tcp" {
+		rawLength := uint16(len(rawQuery))
+		buf := new(bytes.Buffer)
+		err = binary.Write(buf, binary.BigEndian, rawLength)
+		if err != nil {
+			panic(fmt.Sprintf("Error prepending length to raw query.\nError: %v\n", err))
+		}
+		rawQuery = append(buf.Bytes(), rawQuery...)
+	}
 
 	// fmt.Printf("Raw query is:")
 	// for index, value := range rawQuery {
@@ -389,6 +404,7 @@ func queryDomain(domain []byte) {
 	}
 
 	responseBuffer := make([]byte, 4*1024) // UDP capped at 512
+	conn.SetReadDeadline(time.Now().Add(time.Minute))
 	nBytesRecvd, err := conn.Read(responseBuffer)
 	if err != nil {
 		fmt.Printf("Error receiving: %v\n", err)
