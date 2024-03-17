@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
 )
@@ -74,12 +75,12 @@ const (
 // [Sec. 2.3.2 Data Transmission Order]: https://datatracker.ietf.org/doc/html/rfc1035#section-2.3.2
 // [Sec. 3.2 RR definitions]: https://datatracker.ietf.org/doc/html/rfc1035#section-3.2
 type RR struct {
-	Name     bytes.Buffer
+	Name     []label
 	Type     QType  // subset of QType up to TXT (=16)
 	Class    QClass // subset of QClass up to HS (=4)
 	TTL      int32  // positive int32
 	RDLength uint16
-	RData    bytes.Buffer
+	RData    []byte
 }
 
 // Bitfields used in header, see [Sec. 4.1.1 Header section format].
@@ -150,9 +151,15 @@ type BGPHeader struct {
 // google -> hex 06 67 6f 6f 67 6c 65
 //
 // com -> hex 03 63 6f 6d
+//
+// trailing -> hex 00
 type label struct {
 	length byte
 	data   []byte
+}
+
+func (l label) toRawBytes() []byte {
+	return append([]byte{l.length}, l.data...)
 }
 
 // The question section is used to carry the "question" in most queries,
@@ -192,7 +199,94 @@ type BGPMessage struct {
 	Additional []RR
 }
 
-func (m BGPMessage) toRawBytes() []byte { return nil }
+func (r RR) toRawBytes() []byte {
+	var err error
+	buf := new(bytes.Buffer)
+
+	for _, field := range r.Name {
+		_, err = buf.Write(field.toRawBytes())
+		if err != nil {
+			panic(fmt.Sprintf("Error converting RR %v to raw bytes.\nError: %v\n", r, err))
+		}
+	}
+
+	for _, field := range []any{r.Name, r.Type, r.Class, r.TTL, r.RDLength, r.RData} {
+		err = binary.Write(buf, binary.BigEndian, field)
+		if err != nil {
+			panic(fmt.Sprintf("Error converting RR %v to raw bytes.\nError: %v\n", r, err))
+		}
+	}
+
+	_, err = buf.Write(r.RData)
+	if err != nil {
+		panic(fmt.Sprintf("Error converting RR %v to raw bytes.\nError: %v\n", r, err))
+	}
+
+	byteArray := buf.Bytes()
+	hexdumpStyleBytePrint("RR buf:", byteArray)
+	return byteArray
+}
+
+func (h BGPHeader) toRawBytes() []byte {
+	buf := new(bytes.Buffer)
+	var err error
+	for _, field := range []any{h.ID, h.MaskRow, h.QDCount, h.ANCount, h.NSCount, h.ARCount} {
+		err = binary.Write(buf, binary.BigEndian, field)
+		if err != nil {
+			panic(fmt.Sprintf("Error converting header %v to raw bytes.\nError: %v\n", h, err))
+		}
+	}
+
+	byteArray := buf.Bytes()
+	hexdumpStyleBytePrint("header buf:", byteArray)
+	return byteArray
+}
+
+func (q BGPQuestion) toRawBytes() []byte {
+	var err error
+	buf := new(bytes.Buffer)
+
+	for _, field := range q.QNAME {
+		_, err = buf.Write(field.toRawBytes())
+		if err != nil {
+			panic(fmt.Sprintf("Error converting question %v to raw bytes.\nError: %v\n", q, err))
+		}
+	}
+
+	for _, field := range []any{q.QTYPE, q.QCLASS} {
+		err = binary.Write(buf, binary.BigEndian, field)
+		if err != nil {
+			panic(fmt.Sprintf("Error converting question %v to raw bytes.\nError: %v\n", q, err))
+		}
+	}
+
+	byteArray := buf.Bytes()
+	hexdumpStyleBytePrint("header buf:", byteArray)
+	return byteArray
+}
+
+func (m BGPMessage) toRawBytes() []byte {
+	// buf := new(bytes.Buffer)
+	// var err error
+	// for _, field := range []any{m.Header, m.Question, m.Answer, m.Authority, m.Additional} {
+	// 	err = binary.Write(buf, binary.BigEndian, field)
+	// 	if err != nil {
+	// 		panic(fmt.Sprintf("Error converting message %v to raw bytes.\nError: %v\n", m, err))
+	// 	}
+	// }
+	// byteArray := buf.Bytes()
+	// hexdumpStyleBytePrint("RR buf:", byteArray)
+	// return byteArray
+	// return []byte(fmt.Sprintf("%x", m))
+
+	byteArray := append(m.Header.toRawBytes(), m.Question.toRawBytes()...)
+	for _, a := range [][]RR{m.Answer, m.Authority, m.Additional} {
+		for _, value := range a {
+			byteArray = append(byteArray, value.toRawBytes()...)
+		}
+	}
+	return byteArray
+}
 
 func getHeaderID() uint16 { return 0xBEEF }
 
@@ -214,10 +308,11 @@ func splitDomainNameIntoLabels(domain []byte) []label {
 		}
 	}
 
-	labels := make([]label, len(subdomains))
+	labels := make([]label, len(subdomains)+1)
 	for index, subdomain := range subdomains {
 		labels[index] = label{length: byte(len(subdomain)), data: subdomain}
 	}
+	labels[len(subdomains)] = label{length: 0, data: nil}
 
 	return labels
 }
@@ -229,8 +324,23 @@ func buildQuestion(domain []byte) BGPQuestion {
 
 func buildQuery(domain []byte) BGPMessage {
 	header := BGPHeader{ID: getHeaderID(), MaskRow: getHeaderMaskRow(), QDCount: 1, ANCount: 0, NSCount: 0, ARCount: 0}
+	hexdumpStyleBytePrint("Raw header in build:", header.toRawBytes())
 	question := buildQuestion(domain)
 	return BGPMessage{Header: header, Question: question, Answer: nil, Authority: nil, Additional: nil}
+}
+
+func hexdumpStyleBytePrint(msg string, byteArray []byte) {
+	fmt.Printf(msg)
+	for index, value := range byteArray {
+		if index%8 == 0 {
+			fmt.Printf(" ")
+			if index%16 == 0 {
+				fmt.Println()
+			}
+		}
+		fmt.Printf("%02x ", (value))
+	}
+	fmt.Println()
 }
 
 func queryDomain(domain []byte) {
@@ -246,9 +356,30 @@ func queryDomain(domain []byte) {
 
 	fmt.Printf("Query is:\n%v\n", query)
 
-	return
-
 	rawQuery := query.toRawBytes()
+
+	// fmt.Printf("Raw query is:")
+	// for index, value := range rawQuery {
+	// 	if index%8 == 0 {
+	// 		fmt.Printf(" ")
+	// 		if index%16 == 0 {
+	// 			fmt.Println()
+	// 		}
+	// 	}
+	// 	fmt.Printf("%x ", value)
+	// }
+	// fmt.Println()
+
+	hexdumpStyleBytePrint("Raw query is:", rawQuery)
+	// hexdumpStyleBytePrint("Raw header is:", query.Header.toRawBytes())
+	// hexdumpStyleBytePrint("Raw question is:", query.Question.toRawBytes())
+
+	// fmt.Println("Test print 0xBEEF:")
+	// xBeef := 0xBEEF
+	// fmt.Printf("0xBEEF >> 8: %X, 0xBEEF & 0xFF: %X, uint8(0xBEEF): %X, uint8(0xBEEF & xFF): %X\n", xBeef>>8, xBeef&0xFF, uint8(xBeef), uint8(xBeef&0xFF))
+
+	// fmt.Printf("raw header: %x\n", query.Header.toRawBytes())
+	// fmt.Printf("raw question: %x\n", query.Question.toRawBytes())
 
 	nBytesWritten, err := conn.Write(rawQuery)
 	if err != nil {
