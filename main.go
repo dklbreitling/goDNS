@@ -111,7 +111,7 @@ const (
 // See [Sec. 4.1.1 Header section format].
 //
 // [Sec. 4.1.1 Header section format]: https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.1
-type BGPHeader struct {
+type DNSHeader struct {
 	// A 16 bit identifier assigned by the program that
 	// generates any kind of query.  This identifier is copied
 	// the corresponding reply and can be used by the requester
@@ -168,7 +168,7 @@ func (l label) toRawBytes() []byte {
 // contains QDCOUNT (usually 1) entries. See [Sec. 4.1.2 Question section format].
 //
 // [Sec. 4.1.2 Question section format]: https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.2
-type BGPQuestion struct {
+type DNSQuestion struct {
 	// A domain name represented as a sequence of labels, where
 	// each label consists of a length octet followed by that
 	// number of octets.  The domain name terminates with the
@@ -188,13 +188,13 @@ type BGPQuestion struct {
 	QCLASS QClass
 }
 
-type BGPAnswer struct{}
-type BGPAuthority struct{}
-type BGPAdditional struct{}
+type DNSAnswer struct{}
+type DNSAuthority struct{}
+type DNSAdditional struct{}
 
-type BGPMessage struct {
-	Header     BGPHeader
-	Question   BGPQuestion
+type DNSMessage struct {
+	Header     DNSHeader
+	Question   DNSQuestion
 	Answer     []RR
 	Authority  []RR
 	Additional []RR
@@ -228,7 +228,7 @@ func (r RR) toRawBytes() []byte {
 	return byteArray
 }
 
-func (h BGPHeader) toRawBytes() []byte {
+func (h DNSHeader) toRawBytes() []byte {
 	buf := new(bytes.Buffer)
 	var err error
 	for _, field := range []any{h.ID, h.MaskRow, h.QDCount, h.ANCount, h.NSCount, h.ARCount} {
@@ -243,7 +243,7 @@ func (h BGPHeader) toRawBytes() []byte {
 	return byteArray
 }
 
-func (q BGPQuestion) toRawBytes() []byte {
+func (q DNSQuestion) toRawBytes() []byte {
 	var err error
 	buf := new(bytes.Buffer)
 
@@ -266,7 +266,7 @@ func (q BGPQuestion) toRawBytes() []byte {
 	return byteArray
 }
 
-func (m BGPMessage) toRawBytes() []byte {
+func (m DNSMessage) toRawBytes() []byte {
 	// buf := new(bytes.Buffer)
 	// var err error
 	// for _, field := range []any{m.Header, m.Question, m.Answer, m.Authority, m.Additional} {
@@ -318,16 +318,16 @@ func splitDomainNameIntoLabels(domain []byte) []label {
 	return labels
 }
 
-func buildQuestion(domain []byte) BGPQuestion {
+func buildQuestion(domain []byte) DNSQuestion {
 	QName := splitDomainNameIntoLabels(domain)
-	return BGPQuestion{QNAME: QName, QTYPE: QType_A, QCLASS: QCLASS_IN}
+	return DNSQuestion{QNAME: QName, QTYPE: QType_A, QCLASS: QCLASS_IN}
 }
 
-func buildQuery(domain []byte) BGPMessage {
-	header := BGPHeader{ID: getHeaderID(), MaskRow: getHeaderMaskRow(), QDCount: 1, ANCount: 0, NSCount: 0, ARCount: 0}
+func buildQuery(domain []byte) DNSMessage {
+	header := DNSHeader{ID: getHeaderID(), MaskRow: getHeaderMaskRow(), QDCount: 1, ANCount: 0, NSCount: 0, ARCount: 0}
 	hexdumpStyleBytePrint("Raw header in build:", header.toRawBytes())
 	question := buildQuestion(domain)
-	return BGPMessage{Header: header, Question: question, Answer: nil, Authority: nil, Additional: nil}
+	return DNSMessage{Header: header, Question: question, Answer: nil, Authority: nil, Additional: nil}
 }
 
 func hexdumpStyleBytePrint(msg string, byteArray []byte) {
@@ -411,7 +411,7 @@ func queryDomain(domain []byte) {
 	}
 
 	fmt.Printf("Recv'd %d bytes\n", nBytesRecvd)
-	fmt.Printf("Recv'd:\n%x\n", responseBuffer[nBytesRecvd])
+	hexdumpStyleBytePrint("Recv'd:", responseBuffer[:nBytesRecvd])
 }
 
 func main() {
