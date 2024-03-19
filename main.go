@@ -188,10 +188,6 @@ type DNSQuestion struct {
 	QCLASS QClass
 }
 
-type DNSAnswer struct{}
-type DNSAuthority struct{}
-type DNSAdditional struct{}
-
 type DNSMessage struct {
 	Header     DNSHeader
 	Question   DNSQuestion
