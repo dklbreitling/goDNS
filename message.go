@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 )
 
 type DNSMessage struct {
@@ -37,10 +38,36 @@ func (m DNSMessage) toRawBytes() []byte {
 }
 
 func (m DNSMessage) toString() string {
-	s := "Message:\n"
+	s := "; Message:\n"
+
+	s += "; Header:\n"
 	s += m.Header.toString()
+
+	s += "\n; Question:\n"
 	s += m.Question.toString()
-	return s
+
+	if m.Header.ANCount > 0 {
+		s += "\n; Answer:\n"
+		for _, answerRR := range m.Answer {
+			s += answerRR.toString()
+		}
+	}
+
+	if m.Header.NSCount > 0 {
+		s += "\n; Authority:\n"
+		for _, authorityRR := range m.Authority {
+			s += authorityRR.toString()
+		}
+	}
+
+	if m.Header.ARCount > 0 {
+		s += "\n; Additional:\n"
+		for _, additionalRR := range m.Additional {
+			s += additionalRR.toString()
+		}
+	}
+
+	return s + "\n"
 }
 
 func (m DNSMessage) prettyPrint() {
@@ -66,17 +93,46 @@ func parseResponse(responseBuffer []byte, protocol string) DNSMessage {
 
 func validLength(_ uint16) bool { return true }
 
+func readMessage(data []byte, index *int) DNSMessage {
+	header := readHeader(data, index)
+	question := readQuestion(data, index) // TODO: read more than one question (or none?!)
+
+	var answer []RR
+	slog.Debug("Reading ANCount Resource Records.", "ANCount", header.ANCount)
+	for range header.ANCount {
+		answer = append(answer, readRR(data, index))
+	}
+
+	slog.Debug("Reading NSCount Resource Records.", "NSCount", header.NSCount)
+	var authority []RR
+	for range header.NSCount {
+		authority = append(authority, readRR(data, index))
+	}
+
+	slog.Debug("Reading ARCount Resource Records.", "ARCount", header.ARCount)
+	var additional []RR
+	for range header.ARCount {
+		additional = append(additional, readRR(data, index))
+	}
+
+	return DNSMessage{Header: header, Question: question, Answer: answer, Authority: authority, Additional: additional}
+}
+
 func parseTcpResponse(responseBuffer []byte) DNSMessage {
 	index := 0
-
 	length := binary.BigEndian.Uint16(responseBuffer[index : index+2])
 	index += 2
 	if !validLength(length) {
 		panic("Invalid response length field.")
 	}
-	header := readHeaderFromBytes(responseBuffer, &index)
-	question := readQuestionFromBytes(responseBuffer, &index)
-	return DNSMessage{Header: header, Question: question}
+
+	// the two length bytes are skipped to facilitate parsing
+	// of UDP and TCP without special cases
+	packet := responseBuffer[index:]
+	hexdumpFormatted("packet", "dumpresponse", packet)
+
+	index = 0
+	return readMessage(packet, &index)
 
 }
 

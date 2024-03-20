@@ -115,7 +115,7 @@ func queryDomain(domain []byte) {
 	slog.Debug(fmt.Sprintf("Recv'd %d bytes.", nBytesRecvd))
 	hexdumpFormatted("Recv'd:", "dump", responseBuffer[:nBytesRecvd])
 
-	response := parseResponse(responseBuffer, protocol)
+	response := parseResponse(responseBuffer[:nBytesRecvd], protocol)
 	if response.Header.ID != id {
 		panic("Request and response IDs do not match.")
 	}
@@ -177,7 +177,7 @@ func main() {
 			}},
 	)
 	slog.SetDefault(slog.New(h))
-	programLevel.Set(slog.LevelDebug)
+	// programLevel.Set(slog.LevelDebug)
 
 	if len(os.Args) < 2 {
 		panic("Usage: goDNS <domain>")

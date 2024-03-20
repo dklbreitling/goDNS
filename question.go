@@ -68,10 +68,9 @@ func (q DNSQuestion) toRawBytes() []byte {
 }
 
 func (q DNSQuestion) toString() string {
-	s := "\tQuestion:\n"
-	s += fmt.Sprintf("\t\tQNAME: %s\n", qNameToDomainName(q.QNAME))
-	s += fmt.Sprintf("\t\tQTYPE: %s\n", q.QTYPE.toString())
-	s += fmt.Sprintf("\t\tQCLASS: %s\n", q.QCLASS.toString())
+	s := "\t" + qNameToDomainName(q.QNAME)
+	s += "\tQTYPE: " + q.QTYPE.toString()
+	s += "\tQCLASS: " + q.QCLASS.toString()
 	return s
 }
 
@@ -84,7 +83,19 @@ func buildQuestion(domain []byte) DNSQuestion {
 	return DNSQuestion{QNAME: QName, QTYPE: QTYPE_A, QCLASS: QCLASS_IN}
 }
 
-func readQuestionFromBytes(data []byte, index *int) DNSQuestion {
+func readQType(data []byte, index *int) QType {
+	qt := QType(binary.BigEndian.Uint16(data[*index : *index+2]))
+	*index += 2
+	return qt
+}
+
+func readQClass(data []byte, index *int) QClass {
+	qc := QClass(binary.BigEndian.Uint16(data[*index : *index+2]))
+	*index += 2
+	return qc
+}
+
+func readQuestion(data []byte, index *int) DNSQuestion {
 	if index == nil {
 		i := 0
 		index = &i
@@ -93,11 +104,8 @@ func readQuestionFromBytes(data []byte, index *int) DNSQuestion {
 
 	question := DNSQuestion{}
 
-	question.QNAME = readQNameFromBytes(data, index)
-	question.QTYPE = QType(binary.BigEndian.Uint16(data[*index : *index+2]))
-	*index += 2
-	question.QCLASS = QClass(binary.BigEndian.Uint16(data[*index : *index+2]))
-	*index += 2
-
+	question.QNAME = readQName(data, index)
+	question.QTYPE = readQType(data, index)
+	question.QCLASS = readQClass(data, index)
 	return question
 }

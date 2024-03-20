@@ -1,5 +1,7 @@
 package main
 
+import "encoding/binary"
+
 // Domain names in messages are expressed in terms of a sequence of labels.
 // Each label is represented as a one octet length field followed by that
 // number of octets.  Since every domain name ends with the null label of
@@ -72,7 +74,26 @@ func qNameToDomainName(qName []label) string {
 	return s
 }
 
-func readQNameFromBytes(data []byte, index *int) []label {
+// The first two bits are ones.  This allows a pointer to be distinguished
+// from a label, since the label must begin with two zero bits because
+// labels are restricted to 63 octets or less.  (The 10 and 01 combinations
+// are reserved for future use.)  The OFFSET field specifies an offset from
+// the start of the message (i.e., the first octet of the ID field in the
+// domain header).  A zero offset specifies the first byte of the ID field,
+// etc.
+func isNamePointer(data []byte, index *int) bool {
+	return data[*index]&0xC0 == 0xC0
+}
+
+func readQName(data []byte, index *int) []label {
+
+	// TODO: parse pointers
+	if isNamePointer(data, index) {
+		ptr := int(binary.BigEndian.Uint16(data[*index:*index+2]) & 0x3FFF)
+		*index += 2
+		return readQName(data, &ptr)
+	}
+
 	labels := make([]label, 0)
 	for {
 		l := label{}

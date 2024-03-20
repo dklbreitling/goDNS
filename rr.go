@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 )
 
 /* https://datatracker.ietf.org/doc/html/rfc1035#section-2.3.4 Size limits
@@ -60,4 +61,41 @@ func (r RR) toRawBytes() []byte {
 	byteArray := buf.Bytes()
 	hexdumpFormatted("RR buf:", "dump", byteArray)
 	return byteArray
+}
+
+func (r RR) toString() string {
+	s := "\t" + qNameToDomainName(r.Name)
+	s += "\tQTYPE: " + r.Type.toString()
+	s += "\tQCLASS: " + r.Class.toString()
+	s += "\tTTL: " + fmt.Sprint(r.TTL)
+	if r.RDLength == 4 {
+		s += "\tADDRESS: " + ipv4AddrToString(r.RData)
+	} else {
+		s += "\tRDLength: " + fmt.Sprint(r.RDLength)
+		s += fmt.Sprintf("\tRData: % 02X", r.RData)
+	}
+	return s
+}
+
+func ipv4AddrToString(addr []byte) string {
+	return fmt.Sprintf("%d.%d.%d.%d", addr[0], addr[1], addr[2], addr[3])
+}
+
+func readRR(data []byte, index *int) RR {
+	qN := readQName(data, index)
+	qT := readQType(data, index)
+	qC := readQClass(data, index)
+
+	ttl := int32(binary.BigEndian.Uint32(data[*index : *index+4]))
+	*index += 4
+
+	slog.Debug("Reading RR", "Name", qN, "Type", qT, "Class", qC, "TTL", ttl)
+
+	rdl := binary.BigEndian.Uint16(data[*index : *index+2])
+	*index += 2
+
+	rdata := data[*index : *index+int(rdl)]
+	*index += int(rdl)
+
+	return RR{Name: qN, Type: qT, Class: qC, TTL: ttl, RDLength: rdl, RData: rdata}
 }

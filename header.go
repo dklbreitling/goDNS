@@ -63,13 +63,12 @@ func (h DNSHeader) toRawBytes() []byte {
 }
 
 func (h DNSHeader) toString() string {
-	s := "\tHeader:\n"
-	s += fmt.Sprintf("\t\tID: % 02X\n", h.ID)
-	s += fmt.Sprintf("\t\tMask: % 02X\n", h.MaskRow)
-	s += fmt.Sprintf("\t\tQDCount: % 02X\n", h.QDCount)
-	s += fmt.Sprintf("\t\tANCount: % 02X\n", h.ANCount)
-	s += fmt.Sprintf("\t\tNSCount: % 02X\n", h.NSCount)
-	s += fmt.Sprintf("\t\tARCount: % 02X\n", h.ARCount)
+	s := fmt.Sprintf("\tID: % 02X", h.ID)
+	s += fmt.Sprintf("\tMask: % 02X", h.MaskRow)
+	s += fmt.Sprintf("\tQDCount: % 02X", h.QDCount)
+	s += fmt.Sprintf("\tANCount: % 02X", h.ANCount)
+	s += fmt.Sprintf("\tNSCount: % 02X", h.NSCount)
+	s += fmt.Sprintf("\tARCount: % 02X", h.ARCount)
 	return s
 }
 
@@ -80,7 +79,7 @@ func (h DNSHeader) prettyPrint() {
 func getHeaderMaskRow() Header_Bitfield { return HDR_QR_QUERY | HDR_OPCODE_QUERY | HDR_RD }
 func getHeaderID() uint16               { return 0xBEEF }
 
-func readHeaderFromBytes(data []byte, index *int) DNSHeader {
+func readHeader(data []byte, index *int) DNSHeader {
 	if index == nil {
 		i := 0
 		index = &i
