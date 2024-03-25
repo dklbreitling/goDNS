@@ -64,10 +64,10 @@ func (h DNSHeader) toRawBytes() []byte {
 func (h DNSHeader) toString() string {
 	s := fmt.Sprintf("\tID: % 02X", h.ID)
 	s += fmt.Sprintf("\tMask: % 02X", h.MaskRow)
-	s += fmt.Sprintf("\tQDCount: % 02X", h.QDCount)
-	s += fmt.Sprintf("\tANCount: % 02X", h.ANCount)
-	s += fmt.Sprintf("\tNSCount: % 02X", h.NSCount)
-	s += fmt.Sprintf("\tARCount: % 02X", h.ARCount)
+	s += fmt.Sprintf("\tQDCount: %d", h.QDCount)
+	s += fmt.Sprintf("\tANCount: %d", h.ANCount)
+	s += fmt.Sprintf("\tNSCount: %d", h.NSCount)
+	s += fmt.Sprintf("\tARCount: %d", h.ARCount)
 	return s
 }
 
