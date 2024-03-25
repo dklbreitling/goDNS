@@ -110,6 +110,12 @@ func parseResponse(responseBuffer []byte, protocol string) DNSMessage {
 func validLength(_ uint16) bool { return true }
 
 func readMessage(data []byte, index *int) DNSMessage {
+	if index == nil {
+		i := 0
+		index = &i
+		slog.Debug("Index nil in readMessage, setting to zero.")
+	}
+
 	header := readHeader(data, index)
 	question := readQuestion(data, index) // TODO: read more than one question (or none?!)
 
@@ -153,5 +159,5 @@ func parseTcpResponse(responseBuffer []byte) DNSMessage {
 }
 
 func parseUdpResponse(responseBuffer []byte) DNSMessage {
-	panic("Not implemented.")
+	return readMessage(responseBuffer, nil)
 }

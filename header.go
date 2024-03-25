@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log/slog"
 )
 
 // Bitfields used in header, see [Sec. 4.1.1 Header section format].
@@ -80,12 +79,6 @@ func getHeaderMaskRow() Header_Bitfield { return HDR_QR_QUERY | HDR_OPCODE_QUERY
 func getHeaderID() uint16               { return 0xBEEF }
 
 func readHeader(data []byte, index *int) DNSHeader {
-	if index == nil {
-		i := 0
-		index = &i
-		slog.Debug("Index nil in readHeaderFromBytes, setting to zero.")
-	}
-
 	header := DNSHeader{}
 
 	header.ID = binary.BigEndian.Uint16(data[*index : *index+2])

@@ -14,7 +14,7 @@ import (
 
 func getNameServerAddress() string { return "198.41.0.4:53" } // "9.9.9.9:53" }
 
-func getProtocol() string { return "tcp" }
+func getProtocol() string { return "udp" }
 
 func hexdumpFormatted(msg string, fileName string, data []byte) {
 	for index, value := range data {
@@ -125,7 +125,7 @@ func queryDomain(domain []byte) {
 
 func isValidDomain(_ string) bool { return true }
 
-func main() {
+func setupLogger(level slog.Level) {
 	var programLevel = new(slog.LevelVar)
 	h := slog.NewTextHandler(
 		os.Stderr,
@@ -142,11 +142,16 @@ func main() {
 			}},
 	)
 	slog.SetDefault(slog.New(h))
-	programLevel.Set(slog.LevelDebug)
+	programLevel.Set(level)
+}
+
+func main() {
+	setupLogger(slog.LevelDebug)
 
 	if len(os.Args) < 2 {
 		panic("Usage: goDNS <domain>")
 	}
+
 	domain := os.Args[1]
 	if !isValidDomain(domain) {
 		panic("Invalid domain.")
