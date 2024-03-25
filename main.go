@@ -12,7 +12,7 @@ import (
 	"os"
 )
 
-func getNameServerAddress() string { return "9.9.9.9:53" }
+func getNameServerAddress() string { return "198.41.0.4:53" } // "9.9.9.9:53" }
 
 func getProtocol() string { return "tcp" }
 
@@ -126,41 +126,6 @@ func queryDomain(domain []byte) {
 func isValidDomain(_ string) bool { return true }
 
 func main() {
-	// _header := []byte("")
-
-	// 	conn, err := net.Dial("tcp", "9.9.9.9:53")
-	// 	if err != nil {
-	// 		fmt.Printf("Error dialing: %v\n", err)
-	// 	}
-	// 	_, err = conn.Write([]byte("Hello"))
-	// 	if err != nil {
-	// 		fmt.Printf("Error sending: %v\n", err)
-	// 	}
-	// 	buffer := make([]byte, 1024)
-	// 	recv_len, err := conn.Read(buffer)
-	// 	if err != nil {
-	// 		fmt.Printf("Error receiving: %v\n", err)
-	// 	}
-	// 	fmt.Println("Recv'd: ", string(buffer[recv_len]))
-
-	// conn, err := net.Dial("tcp", "google.com:80")
-	// if err != nil {
-	// 	fmt.Printf("Error dialing: %v\n", err)
-	// }
-
-	// fmt.Fprintf(conn, "GET / HTTP/1.0\r\n\r\n")
-	// status, err := bufio.NewReader(conn).ReadString('\n')
-	// fmt.Println("status: ", status)
-	// buffer := make([]byte, 1024*1024)
-	// recv_len, err := conn.Read(buffer)
-	// if err != nil {
-	// 	fmt.Printf("Error receiving: %v\n", err)
-	// }
-	// fmt.Printf("Recv'd %d bytes\n", recv_len)
-	// fmt.Println("Recv'd: ", buffer[recv_len])
-
-	// defer conn.Close()
-
 	var programLevel = new(slog.LevelVar)
 	h := slog.NewTextHandler(
 		os.Stderr,
@@ -177,7 +142,7 @@ func main() {
 			}},
 	)
 	slog.SetDefault(slog.New(h))
-	// programLevel.Set(slog.LevelDebug)
+	programLevel.Set(slog.LevelDebug)
 
 	if len(os.Args) < 2 {
 		panic("Usage: goDNS <domain>")

@@ -19,6 +19,14 @@ const (
 	QTYPE_TXT                    // text strings
 )
 const (
+	// The AAAA resource record type is a record specific to the Internet
+	// class that stores a single IPv6 address.
+	// See [RFC 3596:  DNS Extensions to Support IP Version 6].
+	//
+	// [RFC 3596:  DNS Extensions to Support IP Version 6]: https://datatracker.ietf.org/doc/html/rfc3596
+	QTYPE_AAAA QType = iota + 28
+)
+const (
 	QTYPE_AXFR     = iota + 252 // a request for a transfer of an entire zone
 	QTYPE_MAILB                 // a request for mailbox-related records (MB, MG, or MR)
 	QTYPE_MAILA                 // a request for mail agent RRs (Obsolete - see MX)
@@ -67,6 +75,8 @@ func (qt QType) toString() string {
 		return "MX"
 	case QTYPE_TXT:
 		return "TXT"
+	case QTYPE_AAAA:
+		return "AAAA"
 	case QTYPE_AXFR:
 		return "AXFR"
 	case QTYPE_MAILB:

@@ -43,30 +43,46 @@ func (m DNSMessage) toString() string {
 	s += "; Header:\n"
 	s += m.Header.toString()
 
+	fmt.Print(s)
+	s = ""
+
 	s += "\n; Question:\n"
 	s += m.Question.toString()
+
+	fmt.Print(s)
+	s = ""
 
 	if m.Header.ANCount > 0 {
 		s += "\n; Answer:\n"
 		for _, answerRR := range m.Answer {
 			s += answerRR.toString()
+			fmt.Print(s + "\n")
+			s = ""
 		}
+
 	}
 
 	if m.Header.NSCount > 0 {
 		s += "\n; Authority:\n"
 		for _, authorityRR := range m.Authority {
 			s += authorityRR.toString()
+			fmt.Print(s + "\n")
+			s = ""
 		}
+
 	}
 
 	if m.Header.ARCount > 0 {
 		s += "\n; Additional:\n"
 		for _, additionalRR := range m.Additional {
 			s += additionalRR.toString()
+			fmt.Print(s + "\n")
+			s = ""
 		}
+
 	}
 
+	fmt.Println()
 	return s + "\n"
 }
 

@@ -1,6 +1,9 @@
 package main
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"log/slog"
+)
 
 // Domain names in messages are expressed in terms of a sequence of labels.
 // Each label is represented as a one octet length field followed by that
@@ -86,16 +89,18 @@ func isNamePointer(data []byte, index *int) bool {
 }
 
 func readQName(data []byte, index *int) []label {
-
-	// TODO: parse pointers
-	if isNamePointer(data, index) {
-		ptr := int(binary.BigEndian.Uint16(data[*index:*index+2]) & 0x3FFF)
-		*index += 2
-		return readQName(data, &ptr)
-	}
+	slog.Debug("Reading QName", "index", *index)
 
 	labels := make([]label, 0)
 	for {
+
+		if isNamePointer(data, index) {
+			ptr := int(binary.BigEndian.Uint16(data[*index:*index+2]) & 0x3FFF)
+			*index += 2
+			labels = append(labels, readQName(data, &ptr)...)
+			return labels
+		}
+
 		l := label{}
 		l.length = data[*index]
 		*index++
