@@ -8,27 +8,18 @@ import (
 
 type DNSMessage struct {
 	Header     DNSHeader
-	Question   DNSQuestion
+	Question   []DNSQuestion
 	Answer     []RR
 	Authority  []RR
 	Additional []RR
 }
 
 func (m DNSMessage) toRawBytes() []byte {
-	// buf := new(bytes.Buffer)
-	// var err error
-	// for _, field := range []any{m.Header, m.Question, m.Answer, m.Authority, m.Additional} {
-	// 	err = binary.Write(buf, binary.BigEndian, field)
-	// 	if err != nil {
-	// 		panic(fmt.Sprintf("Error converting message %v to raw bytes.\nError: %v\n", m, err))
-	// 	}
-	// }
-	// byteArray := buf.Bytes()
-	// hexdump("RR buf:", byteArray)
-	// return byteArray
-	// return []byte(fmt.Sprintf("%x", m))
+	byteArray := m.Header.toRawBytes()
 
-	byteArray := append(m.Header.toRawBytes(), m.Question.toRawBytes()...)
+	for _, q := range m.Question {
+		byteArray = append(byteArray, q.toRawBytes()...)
+	}
 	for _, a := range [][]RR{m.Answer, m.Authority, m.Additional} {
 		for _, value := range a {
 			byteArray = append(byteArray, value.toRawBytes()...)
@@ -46,8 +37,15 @@ func (m DNSMessage) toString() string {
 	fmt.Print(s)
 	s = ""
 
-	s += "\n; Question:\n"
-	s += m.Question.toString()
+	if m.Header.QDCount > 0 {
+		s += "\n; Question:\n"
+		for _, q := range m.Question {
+			s += q.toString()
+			fmt.Print(s + "\n")
+			s = ""
+		}
+
+	}
 
 	fmt.Print(s)
 	s = ""
@@ -94,7 +92,7 @@ func buildQuery(domain []byte) DNSMessage {
 	header := DNSHeader{ID: getHeaderID(), MaskRow: getHeaderMaskRow(), QDCount: 1, ANCount: 0, NSCount: 0, ARCount: 0}
 	hexdumpFormatted("Raw header in build:", "dump", header.toRawBytes())
 	question := buildQuestion(domain)
-	return DNSMessage{Header: header, Question: question, Answer: nil, Authority: nil, Additional: nil}
+	return DNSMessage{Header: header, Question: []DNSQuestion{question}, Answer: nil, Authority: nil, Additional: nil}
 }
 
 func parseResponse(responseBuffer []byte, protocol string) DNSMessage {
@@ -117,7 +115,11 @@ func readMessage(data []byte, index *int) DNSMessage {
 	}
 
 	header := readHeader(data, index)
-	question := readQuestion(data, index) // TODO: read more than one question (or none?!)
+
+	var question []DNSQuestion
+	for range header.QDCount {
+		question = append(question, readQuestion(data, index))
+	}
 
 	var answer []RR
 	slog.Debug("Reading ANCount Resource Records.", "ANCount", header.ANCount)
