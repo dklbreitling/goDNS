@@ -90,7 +90,7 @@ func (m DNSMessage) prettyPrint() {
 
 func buildQuery(domain []byte) DNSMessage {
 	header := DNSHeader{ID: getHeaderID(), MaskRow: getHeaderMaskRow(), QDCount: 1, ANCount: 0, NSCount: 0, ARCount: 0}
-	hexdumpFormatted("Raw header in build:", "dump", header.toRawBytes())
+	debugHexdumpFormatted("Raw header in build:", "dump", header.toRawBytes())
 	question := buildQuestion(domain)
 	return DNSMessage{Header: header, Question: []DNSQuestion{question}, Answer: nil, Authority: nil, Additional: nil}
 }
@@ -153,7 +153,7 @@ func parseTcpResponse(responseBuffer []byte) DNSMessage {
 	// the two length bytes are skipped to facilitate parsing
 	// of UDP and TCP without special cases
 	packet := responseBuffer[index:]
-	hexdumpFormatted("packet", "dumpresponse", packet)
+	debugHexdumpFormatted("packet", "dumpresponse", packet)
 
 	index = 0
 	return readMessage(packet, &index)

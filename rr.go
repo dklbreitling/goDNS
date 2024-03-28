@@ -129,7 +129,7 @@ type NSDName struct {
 }
 
 func (nsdn NSDName) bytes() []byte {
-	//TODO: DRY Domain Names
+	// TODO: DRY Domain Names, maybe as a `type DName []label`
 
 	var err error
 	buf := new(bytes.Buffer)
@@ -188,7 +188,7 @@ func (r RR) toRawBytes() []byte {
 	}
 
 	byteArray := buf.Bytes()
-	hexdumpFormatted("RR buf:", "dump", byteArray)
+	debugHexdumpFormatted("RR buf:", "dump", byteArray)
 	return byteArray
 }
 

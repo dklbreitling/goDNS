@@ -12,11 +12,11 @@ import (
 	"os"
 )
 
-func getNameServerAddress() string { return "198.41.0.4:53" } // "9.9.9.9:53" }
+func getNameServerAddress() string { return "198.41.0.4:53" } // "9.9.9.9:53" }  // TODO: implement
 
-func getProtocol() string { return "udp" }
+func getProtocol() string { return "udp" } // TODO: implement
 
-func hexdumpFormatted(msg string, fileName string, data []byte) {
+func debugHexdumpFormatted(msg string, fileName string, data []byte) {
 	for index, value := range data {
 		if index%8 == 0 {
 			msg += " "
@@ -41,10 +41,10 @@ func hexdumpFormatted(msg string, fileName string, data []byte) {
 
 	slog.Debug(fmt.Sprintf("Dumped %d bytes as string to file, plus annotations; appended if file existed.", len(data)), "fileName", fileName)
 
-	hexdump(fileName+"raw", data)
+	debugHexdump(fileName+"raw", data)
 }
 
-func hexdump(fileName string, data []byte) {
+func debugHexdump(fileName string, data []byte) {
 	f, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		panic(err)
@@ -97,7 +97,7 @@ func queryDomain(domain []byte) {
 		rawQuery = append(buf.Bytes(), rawQuery...)
 	}
 
-	hexdumpFormatted("Raw query is:", "dump", rawQuery)
+	debugHexdumpFormatted("Raw query is:", "dump", rawQuery)
 
 	nBytesWritten, err := conn.Write(rawQuery)
 	if err != nil {
@@ -113,7 +113,7 @@ func queryDomain(domain []byte) {
 	}
 
 	slog.Debug(fmt.Sprintf("Recv'd %d bytes.", nBytesRecvd))
-	hexdumpFormatted("Recv'd:", "dump", responseBuffer[:nBytesRecvd])
+	debugHexdumpFormatted("Recv'd:", "dump", responseBuffer[:nBytesRecvd])
 
 	response := parseResponse(responseBuffer[:nBytesRecvd], protocol)
 	if response.Header.ID != id {
@@ -123,7 +123,7 @@ func queryDomain(domain []byte) {
 	response.prettyPrint()
 }
 
-func isValidDomain(_ string) bool { return true }
+func isValidDomain(_ string) bool { return true } // TODO: implement
 
 func setupLogger(level slog.Level) {
 	var programLevel = new(slog.LevelVar)
@@ -146,7 +146,7 @@ func setupLogger(level slog.Level) {
 }
 
 func main() {
-	setupLogger(slog.LevelDebug)
+	setupLogger(slog.LevelInfo)
 
 	if len(os.Args) < 2 {
 		panic("Usage: goDNS <domain>")

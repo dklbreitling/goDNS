@@ -63,7 +63,7 @@ func (q DNSQuestion) toRawBytes() []byte {
 	}
 
 	byteArray := buf.Bytes()
-	hexdumpFormatted("header buf:", "dump", byteArray)
+	debugHexdumpFormatted("header buf:", "dump", byteArray)
 	return byteArray
 }
 
